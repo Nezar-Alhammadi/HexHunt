@@ -1,0 +1,35 @@
+# JavaScript
+**/node_modules/
+**/dist/
+**/dist-ssr/
+*.log
+npm-debug.log*
+
+# Rust / Tauri
+**/target/
+
+# Runtime data and credentials
+.env
+.env.*
+!.env.example
+*.local
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+*.pem
+*.key
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.swp
+
+# Local benchmark artifacts
+bench-results/
+screenshots/
+reports/private/

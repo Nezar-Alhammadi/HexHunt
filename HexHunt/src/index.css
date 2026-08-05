@@ -1,0 +1,17 @@
+:root {
+  font-family: Cantarell, "Noto Sans", "DejaVu Sans", system-ui, sans-serif;
+  color: #17191d;
+  background: #f2f3f5;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: #f2f3f5; }
+button, input, textarea, select { font: inherit; }
+button { color: inherit; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid #f23838; outline-offset: 2px; }
+::selection { background: #f23838; color: #fff; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #101318; }
+::-webkit-scrollbar-thumb { background: #323840; border: 2px solid #101318; border-radius: 5px; }
