@@ -136,7 +136,8 @@ impl Agent for ScriptedAgent {
         // production finish gate with real, stored evidence references.
         if action.name == "finish" && !context.evidence.is_empty() {
             if let Some(final_output) = action.arguments.get_mut("final_output") {
-                if let Ok(mut output) = serde_json::from_value::<FinalOutput>(final_output.clone()) {
+                if let Ok(mut output) = serde_json::from_value::<FinalOutput>(final_output.clone())
+                {
                     if output.evidence_ids.is_empty() {
                         output.evidence_ids = context
                             .evidence
@@ -1237,10 +1238,9 @@ impl AgentRuntime {
             && (task.primary_target.starts_with("http://")
                 || task.primary_target.starts_with("https://"))
         {
-            action.arguments.insert(
-                "url".into(),
-                Value::String(task.primary_target.clone()),
-            );
+            action
+                .arguments
+                .insert("url".into(), Value::String(task.primary_target.clone()));
         }
     }
 
