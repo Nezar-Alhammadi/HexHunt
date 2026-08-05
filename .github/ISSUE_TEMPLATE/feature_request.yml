@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a focused improvement to HexHunt
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What research or evaluation decision is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Explain the smallest useful outcome, not only an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Scope and safety impact
+      description: Describe how authorization, scope, evidence, and secrets should be handled.
+    validations:
+      required: true

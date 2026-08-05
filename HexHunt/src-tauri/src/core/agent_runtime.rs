@@ -123,13 +123,35 @@ impl ScriptedAgent {
 }
 
 impl Agent for ScriptedAgent {
-    fn next_action(&mut self, _context: &AgentContext) -> Result<AgentAction, AgentError> {
-        self.actions.pop_front().unwrap_or_else(|| {
+    fn next_action(&mut self, context: &AgentContext) -> Result<AgentAction, AgentError> {
+        let mut action = self.actions.pop_front().unwrap_or_else(|| {
             Err(AgentError {
                 code: "SCRIPT_EXHAUSTED".into(),
                 message: "The scripted agent has no remaining actions.".into(),
             })
-        })
+        })?;
+
+        // Deterministic scripts cannot know generated Evidence IDs in advance. Mirror what a
+        // model-driven agent sees in its context so managed scripted runs still exercise the
+        // production finish gate with real, stored evidence references.
+        if action.name == "finish" && !context.evidence.is_empty() {
+            if let Some(final_output) = action.arguments.get_mut("final_output") {
+                if let Ok(mut output) = serde_json::from_value::<FinalOutput>(final_output.clone()) {
+                    if output.evidence_ids.is_empty() {
+                        output.evidence_ids = context
+                            .evidence
+                            .iter()
+                            .map(|evidence| evidence.id.clone())
+                            .collect();
+                        if let Ok(value) = serde_json::to_value(output) {
+                            *final_output = value;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(action)
     }
 }
 

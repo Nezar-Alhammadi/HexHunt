@@ -1660,6 +1660,8 @@ mod tests {
             ("ct", ReconObservationSource::CertificateTransparency),
             ("archive", ReconObservationSource::WebArchive),
             ("dns", ReconObservationSource::DnsQuery),
+            ("dns-ownership", ReconObservationSource::DnsOwnership),
+            ("rdap", ReconObservationSource::Rdap),
         ] {
             snapshot.observations.push(ReconObservation {
                 schema_version: CORE_SCHEMA_VERSION,
@@ -1686,6 +1688,20 @@ mod tests {
                 subject_asset_ids: vec![ReconAssetId("asset-root".into())],
                 summary: "HTTP origin observed.".into(),
                 facts: StructuredData::from([("url".into(), Value::String(url.into()))]),
+                confidence: ReconConfidence::High,
+                evidence_ids: vec![],
+                observed_at_ms: 2,
+            });
+        }
+        for port in [80_u16, 443_u16] {
+            snapshot.observations.push(ReconObservation {
+                schema_version: CORE_SCHEMA_VERSION,
+                id: ReconObservationId(format!("observation-tcp-{port}")),
+                run_id: snapshot.run_id.clone(),
+                source: ReconObservationSource::TcpProbe,
+                subject_asset_ids: vec![ReconAssetId("asset-root".into())],
+                summary: "Authorized TCP port observed.".into(),
+                facts: StructuredData::from([("port".into(), Value::from(port))]),
                 confidence: ReconConfidence::High,
                 evidence_ids: vec![],
                 observed_at_ms: 2,

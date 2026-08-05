@@ -1,0 +1,52 @@
+name: Bug report
+description: Report a reproducible HexHunt or HexHunt Bench defect
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not include API keys, cookies, tokens, private targets, or undisclosed findings."
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - HexHunt desktop
+        - Rust core
+        - HexHunt Bench
+        - Packaging or documentation
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the expected and actual behavior using a safe local or redacted example.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: "1. Open…\n2. Select…\n3. Observe…"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version and operating system
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs
+      description: Remove all secrets, identities, and private target data before pasting logs.
+      render: shell
+  - type: checkboxes
+    id: authorization
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed secrets and private target data from this report.
+          required: true
