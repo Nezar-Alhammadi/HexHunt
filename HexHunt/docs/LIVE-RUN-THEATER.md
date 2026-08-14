@@ -1,5 +1,7 @@
 # HexHunt Live Run Theater
 
+![Run Theater overview](../../docs/assets/hexhunt-theater-overview.png)
+
 ## Product objective
 
 The Run Theater makes an autonomous security run understandable while it is happening. A new user should be able to answer five questions without opening raw JSON:
@@ -42,9 +44,13 @@ The right panel is the agent’s working map. It shows the latest plan, coverage
 
 Evidence is separated from observations and hypotheses. Every item shows its persisted ID, source type, description, excerpt, and traceability reference. Unsupported conclusions remain visibly outside the evidence ledger.
 
+![Evidence room](../../docs/assets/hexhunt-evidence-room.png)
+
 ### 5. Outcome room
 
 The final answer, referenced evidence, declared limitations, evaluation verdict, and evaluator reasons are presented together. This makes technical completion different from verified success.
+
+![Verified outcome](../../docs/assets/hexhunt-completed-outcome.png)
 
 ### 6. Technical inspector
 

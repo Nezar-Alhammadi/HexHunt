@@ -1,6 +1,6 @@
 # HexHunt
 
-**Agentic reconnaissance with evidence, scope enforcement, and measurable results.**
+**An evidence-first agentic security platform for authorized web reconnaissance.**
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux-2ea44f.svg)](#install)
@@ -10,13 +10,27 @@ HexHunt is an experimental desktop platform for authorized web-security research
 
 > Use HexHunt only on systems you own or have explicit permission to test.
 
-![HexHunt workflow demo](docs/assets/hexhunt-demo.gif)
+![HexHunt Run Theater showing a real persisted reconnaissance run](docs/assets/hexhunt-theater-overview.png)
+
+## See the agent work
+
+HexHunt does not hide a long autonomous run behind a spinner. **Run Theater** reconstructs persisted runtime records as a causal film: model exchange, planner decision, active hypothesis, selected action, local tool execution, response, evidence, and final outcome.
+
+| Live operation | Evidence room |
+| --- | --- |
+| Follow decisions, hypotheses, tool calls, coverage, and the changing Asset Graph. | Review only claims tied to stored evidence and their source ToolResults. |
+| ![Run Theater live operation](docs/assets/hexhunt-completed-run.png) | ![HexHunt evidence ledger](docs/assets/hexhunt-evidence-room.png) |
+
+![HexHunt verified outcome with referenced evidence and known limitations](docs/assets/hexhunt-completed-outcome.png)
+
+The interface deliberately separates **observations**, **hypotheses**, and **proven evidence**. Raw contracts remain available in Technical Inspector, but they are not the default experience. Visual Recon frames are redacted before capture and retained only in the local application-data directory.
 
 ## Why HexHunt
 
 - **Agentic decisions:** the model chooses the next action from current evidence instead of following a fixed checklist.
 - **Evidence first:** conclusions link back to recorded tool results and observations.
 - **Scope by design:** out-of-scope actions are rejected before execution.
+- **Observable autonomy:** Run Theater exposes concise rationale, actions, network activity, browser observations, hypotheses, and plan changes as they are persisted.
 - **Reproducible measurement:** HexHunt Bench scores discovery, evidence quality, efficiency, stopping, and safety.
 - **Local control:** credentials stay in local application storage and the Rust runtime executes tools.
 
@@ -51,7 +65,7 @@ npm install
 npm run desktop:dev
 ```
 
-## What a run does
+## How a run works
 
 1. You provide a target, a task, and the allowed scope.
 2. The model returns one structured action at a time.
@@ -61,18 +75,27 @@ npm run desktop:dev
 
 No API key is placed in the model prompt, evidence, or run history.
 
+```text
+Authorized mission
+      ↓
+Recon planner ranks information gain
+      ↓
+Model returns one structured action
+      ↓
+Rust validates scope and executes locally
+      ↓
+ToolResult → observation → evidence → Asset Graph
+      ↓
+Next adaptive decision or final evaluated outcome
+```
+
+Run Theater refreshes active runs continuously, supports auto-follow and safe cancellation, and keeps the full operation reviewable after completion. It shows the concise action rationale saved by the runtime—not private chain-of-thought.
+
 ## HexHunt Bench
 
-HexHunt Bench is a separate application for controlled and repeatable recon evaluation. The public suite contains 12 Gold cases with five deterministic variants each; sealed transfer cases remain private to protect evaluation integrity.
+HexHunt Bench is a separate application for controlled and repeatable Recon evaluation. The public suite contains 12 Gold cases with five deterministic variants each; sealed transfer cases remain private to protect evaluation integrity.
 
 ![HexHunt Bench result](docs/assets/hexhunt-bench.png)
-
-<details>
-<summary>See the detailed run interface</summary>
-
-![HexHunt run results](docs/assets/hexhunt-runs.png)
-
-</details>
 
 ```bash
 cd HexHunt-Bench
@@ -86,15 +109,17 @@ Each Bench run can invoke a paid model through OpenRouter. A run starts only aft
 
 | Directory | Purpose |
 | --- | --- |
-| `HexHunt/` | Desktop agent, Rust runtime, recon tools, evidence, evaluation, and run interface. |
+| `HexHunt/` | Desktop agent, Rust runtime, Recon tools, evidence, evaluation, and Run Theater. |
 | `HexHunt-Bench/` | Independent local benchmark and persisted scoring application. |
 | `docs/assets/` | Project screenshots, demo, and share artwork. |
 
 ## Project status
 
-HexHunt is an early public preview. It currently includes HTTP, JavaScript, API, DNS, historical, browser, visual, and external-source reconnaissance foundations; an Asset Graph; hypotheses and critic feedback; SQLite run history; and OpenRouter model integration.
+HexHunt is an early public preview. It currently includes HTTP, JavaScript, API, DNS, historical, browser, visual, and external-source reconnaissance foundations; an Asset Graph; hypotheses and critic feedback; SQLite run history; OpenRouter model integration; and an observable Run Theater.
 
 Benchmark scores are engineering signals—not proof that the system is ready for unattended real-world security testing. Keep a human in control and stay inside written authorization.
+
+For the interface architecture, artifact privacy model, and follow-on observability plan, read [Live Run Theater](HexHunt/docs/LIVE-RUN-THEATER.md).
 
 ## Security and contributing
 
