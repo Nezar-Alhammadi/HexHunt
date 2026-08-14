@@ -15,8 +15,9 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeSet,
+    fs,
     io::Read,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -32,6 +33,7 @@ const MAX_SCREENSHOT_BYTES: usize = 4 * 1024 * 1024;
 const MAX_VISION_RESPONSE_BYTES: usize = 256 * 1024;
 const VIEWPORT_WIDTH: u32 = 1365;
 const VIEWPORT_HEIGHT: u32 = 768;
+pub const VISUAL_ARTIFACT_DIR_ENV: &str = "HEXHUNT_VISUAL_ARTIFACT_DIR";
 
 #[derive(Clone, Debug)]
 pub struct PreparedVisualReconCall {
@@ -233,16 +235,29 @@ impl VisualReconTool {
             .analyzer
             .analyze(&screenshot.final_url, &screenshot.bytes)?;
         let screenshot_sha256 = hex_sha256(&screenshot.bytes);
+        let screenshot_retained = retain_screenshot(&screenshot_sha256, &screenshot.bytes);
         let observation = sanitize_observation(analysis.observation);
         let mut data = StructuredData::new();
         data.insert("requested_url".into(), Value::String(call.url));
         data.insert("final_url".into(), Value::String(screenshot.final_url));
-        data.insert("screenshot_sha256".into(), Value::String(screenshot_sha256));
+        data.insert(
+            "screenshot_sha256".into(),
+            Value::String(screenshot_sha256.clone()),
+        );
         data.insert(
             "screenshot_bytes".into(),
             Value::from(screenshot.bytes.len() as u64),
         );
-        data.insert("screenshot_retained".into(), Value::Bool(false));
+        data.insert(
+            "screenshot_retained".into(),
+            Value::Bool(screenshot_retained),
+        );
+        data.insert(
+            "screenshot_artifact_id".into(),
+            screenshot_retained
+                .then(|| Value::String(screenshot_sha256.clone()))
+                .unwrap_or(Value::Null),
+        );
         data.insert("viewport_width".into(), Value::from(VIEWPORT_WIDTH));
         data.insert("viewport_height".into(), Value::from(VIEWPORT_HEIGHT));
         data.insert(
@@ -297,6 +312,50 @@ impl VisualReconTool {
             output_tokens: analysis.output_tokens,
         })
     }
+}
+
+fn retain_screenshot(artifact_id: &str, bytes: &[u8]) -> bool {
+    let Some(directory) = std::env::var_os(VISUAL_ARTIFACT_DIR_ENV).map(PathBuf::from) else {
+        return false;
+    };
+    if fs::create_dir_all(&directory).is_err() {
+        return false;
+    }
+    let destination = directory.join(format!("{artifact_id}.png"));
+    if destination.exists() {
+        return true;
+    }
+    let temporary = directory.join(format!(".{artifact_id}.tmp"));
+    fs::write(&temporary, bytes)
+        .and_then(|_| fs::rename(temporary, destination))
+        .is_ok()
+}
+
+pub fn read_visual_artifact(artifact_id: &str) -> Result<String, String> {
+    if artifact_id.len() != 64 || !artifact_id.bytes().all(|value| value.is_ascii_hexdigit()) {
+        return Err("VISUAL_ARTIFACT_ID_INVALID: The screenshot artifact ID is invalid.".into());
+    }
+    let directory = std::env::var_os(VISUAL_ARTIFACT_DIR_ENV)
+        .map(PathBuf::from)
+        .ok_or_else(|| {
+            "VISUAL_ARTIFACT_STORE_UNAVAILABLE: The local screenshot store is unavailable."
+                .to_string()
+        })?;
+    read_visual_artifact_from(&directory, artifact_id)
+}
+
+fn read_visual_artifact_from(directory: &Path, artifact_id: &str) -> Result<String, String> {
+    let path = directory.join(format!("{artifact_id}.png"));
+    let bytes = fs::read(path).map_err(|_| {
+        "VISUAL_ARTIFACT_NOT_FOUND: The local screenshot could not be found.".to_string()
+    })?;
+    if bytes.is_empty() || bytes.len() > MAX_SCREENSHOT_BYTES {
+        return Err("VISUAL_ARTIFACT_INVALID: The stored screenshot is invalid.".into());
+    }
+    Ok(format!(
+        "data:image/png;base64,{}",
+        BASE64_STANDARD.encode(bytes)
+    ))
 }
 
 #[cfg(test)]

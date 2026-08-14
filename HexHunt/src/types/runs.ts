@@ -141,6 +141,31 @@ export type ModelCallRecord = {
 export type Page<T> = { items: T[]; offset: number; limit: number; total: number }
 export type RunListItem = { run: Run; task_title: string; evaluation_verdict: EvaluationVerdict | null; model: string | null }
 export type RunFailure = { code: string; message: string }
+export type ReconAsset = {
+  schema_version: number; id: string; kind: string; canonical_value: string; display_name: string | null
+  scope: string; scope_reason: string; confidence: string; first_seen_at_ms: number; last_seen_at_ms: number; tags: string[]
+}
+export type ReconObservation = {
+  schema_version: number; id: string; run_id: string; source: string; subject_asset_ids: string[]
+  summary: string; facts: Record<string, unknown>; confidence: string; evidence_ids: string[]; observed_at_ms: number
+}
+export type ReconHypothesis = {
+  schema_version: number; id: string; kind: string | null; statement: string; status: string; subject_asset_ids: string[]
+  rationale: string; confidence: string; priority: string | null; recommended_capability: string | null
+  supporting_observation_ids: string[]; contradicting_observation_ids: string[]
+}
+export type ReconKnowledgeGap = { schema_version: number; id: string; asset_id: string; capability: string; description: string; priority: string; actionable: boolean; blocked_reason: string | null }
+export type ReconDecision = {
+  schema_version: number; run_id: string; step: number; mode: string; hypothesis_id: string | null
+  knowledge_gaps: ReconKnowledgeGap[]; candidate_actions: Array<Record<string, unknown>>
+  action_scores: Array<Record<string, unknown>>; recommended_action_id: string | null; selected_action_id: string | null
+  coverage: { in_scope_assets: number; observed_assets: number; actionable_gaps: number; blocked_gaps: number; coverage_percent: number; active_hypotheses: number; supported_hypotheses: number; review_ready: boolean } | null
+  decision_summary: string; stop_reason_code: string | null; stop_reason: string | null
+}
+export type ReconSnapshot = {
+  schema_version: number; id: string; run_id: string; created_at_ms: number; assets: ReconAsset[]
+  relations: Array<Record<string, unknown>>; observations: ReconObservation[]; hypotheses: ReconHypothesis[]; decisions: ReconDecision[]
+}
 export type RunDetails = {
   run: Run
   task: Task
@@ -148,6 +173,7 @@ export type RunDetails = {
   tool_results: Page<ToolResult>
   evidence: Page<Evidence>
   model_calls: Page<ModelCallRecord>
+  recon_snapshot: ReconSnapshot
   evaluation: EvaluationResult | null
   failure: RunFailure | null
 }

@@ -108,6 +108,11 @@ fn external_recon_source_status() -> core::ExternalSourceStatus {
 }
 
 #[tauri::command]
+fn get_visual_artifact(artifact_id: String) -> Result<String, String> {
+    core::read_visual_artifact(&artifact_id)
+}
+
+#[tauri::command]
 fn create_run(
     state: tauri::State<'_, std::sync::Arc<core::RunService>>,
     task: core::Task,
@@ -279,6 +284,9 @@ pub fn run() {
         .manage(std::sync::Arc::new(scope_guard::ScopeGuardState::default()))
         .setup(|app| {
             let app_data_dir = app.path().app_data_dir()?;
+            let visual_artifact_dir = app_data_dir.join("visual-artifacts");
+            std::fs::create_dir_all(&visual_artifact_dir)?;
+            std::env::set_var(core::VISUAL_ARTIFACT_DIR_ENV, visual_artifact_dir);
             let repository = std::sync::Arc::new(core::SqliteRunRepository::open(
                 &app_data_dir.join("hexhunt-v1.sqlite3"),
             )?);
@@ -297,6 +305,7 @@ pub fn run() {
             list_browser_identities,
             delete_browser_identity,
             external_recon_source_status,
+            get_visual_artifact,
             create_run,
             start_run,
             get_run,

@@ -71,3 +71,13 @@ export async function executeAgentRun(runId: string): Promise<void> {
   requireDesktop()
   await invoke('execute_agent_run', { runId })
 }
+
+export async function cancelRun(runId: string, reason = 'Stopped by the operator.'): Promise<Run> {
+  requireDesktop()
+  return invoke<Run>('cancel_run', { runId, reason })
+}
+
+export async function getVisualArtifact(artifactId: string): Promise<string> {
+  requireDesktop()
+  return invoke<string>('get_visual_artifact', { artifactId })
+}

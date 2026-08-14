@@ -1,7 +1,7 @@
 use super::{
-    EvaluationResult, EvaluationVerdict, Evidence, ModelCallRecord, Run, RunEvent, RunEventKind,
-    RunFailure, RunId, RunService, RunServiceError, RunServiceErrorCode, RunStatus, Task,
-    ToolResult,
+    EvaluationResult, EvaluationVerdict, Evidence, ModelCallRecord, ReconSnapshot, Run, RunEvent,
+    RunEventKind, RunFailure, RunId, RunService, RunServiceError, RunServiceErrorCode, RunStatus,
+    Task, ToolResult,
 };
 use serde::{Deserialize, Serialize};
 
@@ -51,6 +51,7 @@ pub struct RunDetails {
     pub tool_results: Page<ToolResult>,
     pub evidence: Page<Evidence>,
     pub model_calls: Page<ModelCallRecord>,
+    pub recon_snapshot: ReconSnapshot,
     pub evaluation: Option<EvaluationResult>,
     pub failure: Option<RunFailure>,
 }
@@ -128,6 +129,7 @@ impl RunService {
             tool_results: paginate(all_tool_results, &page),
             evidence: paginate(all_evidence, &page),
             model_calls: paginate(all_model_calls, &page),
+            recon_snapshot: self.get_recon_snapshot(run_id)?,
             failure,
         })
     }
