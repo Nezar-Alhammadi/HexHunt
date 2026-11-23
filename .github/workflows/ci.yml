@@ -26,6 +26,8 @@ jobs:
           cache-dependency-path: ${{ matrix.project }}/package-lock.json
       - run: npm ci
       - run: npm run build
+      - if: matrix.project == 'HexHunt-Bench'
+        run: npm test
 
   rust:
     runs-on: ubuntu-24.04

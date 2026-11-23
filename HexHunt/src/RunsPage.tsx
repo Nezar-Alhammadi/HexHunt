@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { cancelRun, getRunDetails, getVisualArtifact, listRuns, normalizeRunError } from './api/runs'
 import { EmptyState, ErrorState, JsonViewer, LoadingState, StatusBadge, formatDuration, formatTime, humanize, shortId } from './components/ui'
+import { demoRun } from './demoRun'
 import type { Evidence, ModelCallRecord, ReconDecision, ReconHypothesis, RunDetails, RunEvent, RunListItem, RunStatus, ToolResult } from './types/runs'
 
 type TheaterView = 'live' | 'evidence' | 'report' | 'inspector'
@@ -14,6 +15,7 @@ type Props = {
   selectedRunId: string | null
   onSelectRun: (runId: string | null) => void
   executionError?: string
+  onOpenDemo: () => void
   returnToExperiment?: { id: string; name?: string } | null
   onReturnToExperiment?: () => void
 }
@@ -21,7 +23,7 @@ type Props = {
 const terminalStatuses: RunStatus[] = ['completed', 'failed', 'cancelled', 'budget_exhausted', 'scope_blocked']
 const isActive = (status: RunStatus) => status === 'created' || status === 'running'
 
-export default function RunsPage({ selectedRunId, onSelectRun, executionError, returnToExperiment, onReturnToExperiment }: Props) {
+export default function RunsPage({ selectedRunId, onSelectRun, executionError, onOpenDemo, returnToExperiment, onReturnToExperiment }: Props) {
   const [runs, setRuns] = useState<RunListItem[]>([])
   const [details, setDetails] = useState<RunDetails | null>(null)
   const [loading, setLoading] = useState(false)
@@ -29,6 +31,9 @@ export default function RunsPage({ selectedRunId, onSelectRun, executionError, r
   const [error, setError] = useState(executionError ?? '')
   const [query, setQuery] = useState('')
   const [view, setView] = useState<TheaterView>('live')
+  const detailsRequest = useRef({ sequence: 0, pending: false })
+  const selectedDetails = details?.run.id === selectedRunId ? details : null
+  const selectedStatus = selectedDetails?.run.status
 
   const loadList = useCallback(async () => {
     try { setRuns((await listRuns(0, 200)).items); setError('') }
@@ -36,23 +41,47 @@ export default function RunsPage({ selectedRunId, onSelectRun, executionError, r
     finally { setListLoading(false) }
   }, [])
   const loadDetails = useCallback(async (runId: string, quiet = false) => {
+    const state = detailsRequest.current
+    if (quiet && state.pending) return
+    const request = ++state.sequence
+    state.pending = true
     if (!quiet) setLoading(true)
-    try { setDetails(await getRunDetails(runId, 0, 500)); setError('') }
-    catch (cause) { const value = normalizeRunError(cause); setError(`${value.code}: ${value.message}`) }
-    finally { if (!quiet) setLoading(false) }
+    try {
+      const result = await getRunDetails(runId, 0, 500)
+      if (request !== state.sequence) return
+      setDetails(result)
+      setError('')
+    } catch (cause) {
+      if (request !== state.sequence) return
+      const value = normalizeRunError(cause)
+      setError(`${value.code}: ${value.message}`)
+    } finally {
+      if (request === state.sequence) {
+        state.pending = false
+        setLoading(false)
+      }
+    }
   }, [])
 
   useEffect(() => { void loadList() }, [loadList])
   useEffect(() => {
+    const request = detailsRequest.current
     setView('live')
     if (selectedRunId) void loadDetails(selectedRunId)
-    else setDetails(null)
+    else {
+      setDetails(null)
+      setLoading(false)
+    }
+    return () => {
+      request.sequence++
+      request.pending = false
+    }
   }, [selectedRunId, loadDetails])
   useEffect(() => {
-    if (!selectedRunId || !details || !isActive(details.run.status)) return
+    if (!selectedRunId || !selectedStatus || !isActive(selectedStatus)) return
     const timer = window.setInterval(() => { void loadDetails(selectedRunId, true); void loadList() }, 850)
     return () => window.clearInterval(timer)
-  }, [selectedRunId, details?.run.status, loadDetails, loadList])
+  }, [selectedRunId, selectedStatus, loadDetails, loadList])
   useEffect(() => { if (executionError) setError(executionError) }, [executionError])
 
   const filteredRuns = useMemo(() => {
@@ -65,6 +94,7 @@ export default function RunsPage({ selectedRunId, onSelectRun, executionError, r
     <header className="theater-page-header">
       <div><span className="live-kicker"><Radio size={13}/>Agent operations</span><h1>Run Theater</h1><p>Watch every decision, action, response, and piece of evidence in causal order.</p></div>
       <div className="theater-header-actions">
+        <button className="button secondary" onClick={onOpenDemo}><Play size={14}/>Open sample run</button>
         {returnToExperiment && onReturnToExperiment ? <button className="button secondary" onClick={onReturnToExperiment}><ArrowLeft size={14}/>Experiment</button> : null}
         <button className="button secondary" onClick={refresh}><RefreshCw size={14}/>Refresh</button>
       </div>
@@ -73,9 +103,25 @@ export default function RunsPage({ selectedRunId, onSelectRun, executionError, r
     <div className="theater-shell">
       <RunRail runs={filteredRuns} selectedRunId={selectedRunId} query={query} onQuery={setQuery} onSelect={onSelectRun} loading={listLoading}/>
       <main className="theater-stage">
-        {loading ? <LoadingState label="Opening the run theater…"/> : details ? <RunStage details={details} view={view} onView={setView} onRefresh={() => loadDetails(details.run.id, true)}/> : <TheaterEmpty/>}
+        {loading ? <LoadingState label="Opening the run theater…"/> : selectedDetails ? <RunStage key={selectedDetails.run.id} details={selectedDetails} view={view} onView={setView} onRefresh={() => loadDetails(selectedDetails.run.id, true)}/> : <TheaterEmpty/>}
       </main>
     </div>
+  </div>
+}
+
+export function SampleRunPage({ onBack }: { onBack: () => void }) {
+  const [view, setView] = useState<TheaterView>('report')
+  return <div className="run-theater-page">
+    <header className="theater-page-header">
+      <div>
+        <h1>Sample run</h1>
+        <p>Explore the outcome, its evidence, and the recorded activity with fictional data.</p>
+      </div>
+      <button className="button secondary" onClick={onBack}><ArrowLeft size={14}/>Back</button>
+    </header>
+    <main className="theater-stage">
+      <RunStage details={demoRun} view={view} onView={setView}/>
+    </main>
   </div>
 }
 
@@ -98,24 +144,25 @@ function TheaterEmpty() {
   return <div className="theater-empty"><div className="empty-orbit"><Bot size={34}/><span/><span/><span/></div><h2>Select an operation</h2><p>The theater reconstructs the agent’s work as a readable story—not a wall of logs.</p><div><span><BrainCircuit size={15}/>Decisions</span><span><Globe2 size={15}/>Requests</span><span><Image size={15}/>Visuals</span><span><CheckCircle2 size={15}/>Evidence</span></div></div>
 }
 
-function RunStage({ details, view, onView, onRefresh }: { details: RunDetails; view: TheaterView; onView: (view: TheaterView) => void; onRefresh: () => void }) {
+function RunStage({ details, view, onView, onRefresh }: { details: RunDetails; view: TheaterView; onView: (view: TheaterView) => void; onRefresh?: () => void }) {
   const [stopping, setStopping] = useState(false)
+  const [evidenceId, setEvidenceId] = useState<string>()
   const stop = async () => {
     setStopping(true)
-    try { await cancelRun(details.run.id); onRefresh() } finally { setStopping(false) }
+    try { await cancelRun(details.run.id); onRefresh?.() } finally { setStopping(false) }
   }
   const active = isActive(details.run.status)
   return <>
     <RunMission details={details} active={active} stopping={stopping} onStop={stop}/>
     <nav className="theater-views" aria-label="Run views">
       <ViewButton active={view === 'live'} onClick={() => onView('live')} icon={<Radio size={14}/>} label="Live operation" count={details.events.total}/>
-      <ViewButton active={view === 'evidence'} onClick={() => onView('evidence')} icon={<CheckCircle2 size={14}/>} label="Evidence room" count={details.evidence.total}/>
+      <ViewButton active={view === 'evidence'} onClick={() => { setEvidenceId(undefined); onView('evidence') }} icon={<CheckCircle2 size={14}/>} label="Evidence room" count={details.evidence.total}/>
       <ViewButton active={view === 'report'} onClick={() => onView('report')} icon={<FileSearch size={14}/>} label="Outcome"/>
       <ViewButton active={view === 'inspector'} onClick={() => onView('inspector')} icon={<TerminalSquare size={14}/>} label="Technical inspector"/>
     </nav>
     {view === 'live' ? <LiveOperation details={details}/> : null}
-    {view === 'evidence' ? <EvidenceRoom details={details}/> : null}
-    {view === 'report' ? <OutcomeRoom details={details}/> : null}
+    {view === 'evidence' ? <EvidenceRoom details={details} selectedId={evidenceId}/> : null}
+    {view === 'report' ? <OutcomeRoom details={details} onOpenEvidence={(id) => { setEvidenceId(id); onView('evidence') }}/> : null}
     {view === 'inspector' ? <TechnicalInspector details={details}/> : null}
   </>
 }
@@ -137,7 +184,7 @@ function RunMission({ details, active, stopping, onStop }: { details: RunDetails
     <div className="mission-telemetry">
       <Telemetry label="Current phase" value={phase.label} hint={phase.hint}/>
       <Telemetry label="Step" value={`${details.run.current_step} / ${details.task.budget.max_steps}`} hint={`${budgetPercent(details.run.current_step, details.task.budget.max_steps)}% step budget`}/>
-      <Telemetry label="Model" value={details.model_calls.items.at(-1)?.model?.split('/').at(-1) ?? 'Waiting'} hint={`${details.run.usage.model_calls} calls`}/>
+      <Telemetry label="Model" value={details.model_calls.items.at(-1)?.model?.split('/').at(-1) ?? (active ? 'Waiting' : 'No model calls')} hint={`${details.run.usage.model_calls} calls`}/>
       <Telemetry label="Network" value={`${details.run.usage.http_requests} requests`} hint={`${details.tool_results.total} tool results`}/>
       <Telemetry label="Knowledge" value={`${details.recon_snapshot.assets.length} assets`} hint={`${details.recon_snapshot.hypotheses.length} hypotheses`}/>
       <Telemetry label="Evidence" value={String(details.evidence.total)} hint={`${details.recon_snapshot.observations.length} observations`}/>
@@ -327,15 +374,56 @@ function CoverageRing({ value }: { value: number }) {
   return <div className="coverage-meter"><div style={{ '--coverage': `${Math.max(0, Math.min(100, value)) * 3.6}deg` } as CSSProperties}><strong>{value}%</strong><span>coverage</span></div></div>
 }
 
-function EvidenceRoom({ details }: { details: RunDetails }) {
+function EvidenceRoom({ details, selectedId }: { details: RunDetails; selectedId?: string }) {
+  const selectedEvidence = useRef<HTMLElement>(null)
+  useEffect(() => {
+    selectedEvidence.current?.focus()
+  }, [selectedId])
   if (!details.evidence.items.length) return <EmptyState title="No evidence recorded yet" description="As tools produce verifiable observations, evidence will appear here with its source and Run link."/>
-  return <div className="evidence-room"><header><div><span>EVIDENCE LEDGER</span><h3>What the agent can actually prove</h3><p>Every item is tied to this run and a recorded source. Conclusions without evidence remain hypotheses.</p></div><strong>{details.evidence.total}</strong></header><div>{details.evidence.items.map((item, index) => <article key={item.id}><span>{String(index + 1).padStart(2, '0')}</span><div><small>{humanize(item.source.type)} · {shortId(item.id)}</small><h4>{item.description}</h4><p>{item.value_or_excerpt}</p><details><summary>Traceability</summary><JsonViewer value={item.source} label="Reveal source reference"/></details></div><CheckCircle2 size={18}/></article>)}</div></div>
+  return <div className="evidence-room"><header><div><span>EVIDENCE LEDGER</span><h3>What the agent can actually prove</h3><p>Every item is tied to this run and a recorded source. Conclusions without evidence remain hypotheses.</p></div><strong>{details.evidence.total}</strong></header><div>{details.evidence.items.map((item, index) => <article key={item.id} ref={item.id === selectedId ? selectedEvidence : undefined} tabIndex={item.id === selectedId ? -1 : undefined}><span>{String(index + 1).padStart(2, '0')}</span><div><small>{humanize(item.source.type)} · {shortId(item.id)}</small><h4>{item.description}</h4><p>{item.value_or_excerpt}</p><details><summary>Traceability</summary><JsonViewer value={item.source} label="Reveal source reference"/></details></div><CheckCircle2 size={18}/></article>)}</div></div>
 }
 
-function OutcomeRoom({ details }: { details: RunDetails }) {
+function OutcomeRoom({ details, onOpenEvidence }: { details: RunDetails; onOpenEvidence: (id: string) => void }) {
   const output = details.run.final_output
   const evaluation = details.evaluation
-  return <div className="outcome-room"><section className={`outcome-hero ${evaluation?.passed ? 'passed' : details.run.status}`}><span>{evaluation?.passed ? <CheckCircle2 size={24}/> : <FileSearch size={24}/>}</span><div><small>FINAL OUTCOME</small><h3>{evaluation?.passed ? 'Verified result' : details.run.status === 'completed' ? 'Completed—review required' : `Run ${humanize(details.run.status).toLowerCase()}`}</h3><p>{output?.answer ?? details.failure?.message ?? 'No final answer was saved.'}</p></div><StatusBadge value={evaluation?.verdict ?? details.run.status}/></section><div className="outcome-columns"><section><h4>Evidence referenced</h4>{output?.evidence_ids.length ? output.evidence_ids.map((id) => <span key={id}><CheckCircle2 size={13}/>{shortId(id)}</span>) : <p>No evidence IDs were referenced.</p>}</section><section><h4>Known limitations</h4>{output?.limitations.length ? output.limitations.map((item) => <span key={item}><AlertTriangle size={13}/>{item}</span>) : <p>No limitations were recorded.</p>}</section></div>{evaluation ? <section className="evaluation-story"><div><small>AUTOMATED EVALUATION</small><h4>{evaluation.passed ? 'The evidence and final output passed' : 'The result needs attention'}</h4></div><div><strong>{evaluation.score == null ? '—' : `${Math.round(evaluation.score * (evaluation.score <= 1 ? 100 : 1))}%`}</strong><span>score</span></div><ul>{[...evaluation.success_reasons, ...evaluation.failure_reasons].map((reason) => <li key={reason}>{reason}</li>)}</ul></section> : null}</div>
+  return <div className="outcome-room">
+    <section className={`outcome-hero ${evaluation?.passed ? 'passed' : details.run.status}`}>
+      <span>{evaluation?.passed ? <CheckCircle2 size={24}/> : <FileSearch size={24}/>}</span>
+      <div>
+        <small>FINAL OUTCOME</small>
+        <h3>{evaluation?.passed ? 'Verified result' : details.run.status === 'completed' ? 'Completed, review required' : `Run ${humanize(details.run.status).toLowerCase()}`}</h3>
+        <p>{output?.answer ?? details.failure?.message ?? 'No final answer was saved.'}</p>
+      </div>
+      <StatusBadge value={evaluation?.verdict ?? details.run.status}/>
+    </section>
+    <div className="outcome-columns">
+      <section>
+        <h4>Evidence referenced</h4>
+        {output?.evidence_ids.length ? output.evidence_ids.map((id) => {
+          const evidence = details.evidence.items.find((item) => item.id === id)
+          return evidence
+            ? <button type="button" key={id} className="evidence-link" onClick={() => onOpenEvidence(id)}>
+                <CheckCircle2 size={13}/>{evidence.description}
+              </button>
+            : <span key={id}>{shortId(id)} · Evidence unavailable in this view</span>
+        }) : <p>No evidence IDs were referenced.</p>}
+      </section>
+      <section>
+        <h4>Known limitations</h4>
+        {output?.limitations.length
+          ? output.limitations.map((item) => <span key={item}><AlertTriangle size={13}/>{item}</span>)
+          : <p>No limitations were recorded.</p>}
+      </section>
+    </div>
+    {evaluation ? <section className="evaluation-story">
+      <div>
+        <small>AUTOMATED EVALUATION</small>
+        <h4>{evaluation.passed ? 'The evidence and final output passed' : 'The result needs attention'}</h4>
+      </div>
+      <div><strong>{evaluation.score == null ? '—' : `${Math.round(evaluation.score * (evaluation.score <= 1 ? 100 : 1))}%`}</strong><span>score</span></div>
+      <ul>{[...evaluation.success_reasons, ...evaluation.failure_reasons].map((reason) => <li key={reason}>{reason}</li>)}</ul>
+    </section> : null}
+  </div>
 }
 
 function TechnicalInspector({ details }: { details: RunDetails }) {

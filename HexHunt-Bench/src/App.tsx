@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
+import { createPublicBenchSummary, type BenchResult } from './benchResult'
 import './App.css'
 
 type Tab = 'cases' | 'results' | 'method'
@@ -24,62 +25,6 @@ interface BenchCase {
   clean: boolean
   variantCount: number
   expectedFindingCount: number
-}
-
-interface FindingResult {
-  id: string
-  label: string
-  category: string
-  detected: boolean
-  evidenceBacked: boolean
-  weight: number
-}
-
-interface BenchMetrics {
-  weightedRecall: number
-  precision: number
-  evidenceCoverage: number
-  stopAccuracy: number
-  efficiency: number
-  safety: number
-  actionValidity?: number
-  expectedFindings: number
-  detectedFindings: number
-  unexpectedHighSignalHypotheses: number
-  invalidActions: number
-  repeatedActions: number
-  scopeViolationAttempts: number
-  fabricatedEvidenceReferences: number
-}
-
-interface BenchResult {
-  resultId: string
-  createdAtMs: number
-  caseId: string
-  caseTitle: string
-  category: string
-  variant: number
-  sealed: boolean
-  clean: boolean
-  runId: string
-  runStatus: string
-  passed: boolean
-  score: number
-  metrics: BenchMetrics
-  findings: FindingResult[]
-  hardFailures: string[]
-  actionRejections: string[]
-  measurementWarnings: string[]
-  runtimeError?: string
-  steps: number
-  httpRequests: number
-  modelCalls: number
-  inputTokens: number
-  outputTokens: number
-  durationMs: number
-  model: string
-  actualProviders: string[]
-  promptVersion: number
 }
 
 const percent = (value: number) => `${Math.round(value * 100)}%`
@@ -246,11 +191,17 @@ function Empty({ title, text, action }: { title: string; text: string; action?: 
 
 function ResultDetail({ result }: { result: BenchResult }) {
   const m = result.metrics
+  const exportSummary = createPublicBenchSummary(result)
   return <>
     <div className="result-head">
       <div><p className="eyebrow">RUN {result.runId.slice(0, 8)} · VARIANT {result.variant + 1}</p><h2>{result.caseTitle}</h2><p>{result.model} · Prompt v{result.promptVersion}</p></div>
       <div className={`score-ring ${result.passed ? 'pass' : 'fail'}`}><strong>{Math.round(result.score)}</strong><span>{result.passed ? 'Passed' : 'Failed'}</span></div>
     </div>
+    {exportSummary && <a
+      className="share-result"
+      download="hexhunt-bench-summary.json"
+      href={`data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(exportSummary, null, 2) + '\n')}`}
+    >Download redacted JSON summary</a>}
     {(result.runtimeError || result.hardFailures.length > 0) && <div className="alert result-alert"><strong>Why it failed</strong><span>{result.runtimeError ?? result.hardFailures.join(' · ')}</span></div>}
     {(result.actionRejections?.length > 0 || result.measurementWarnings?.length > 0) && <div className="run-warnings">
       <strong>Recovered issues and measurement notes</strong>
@@ -262,7 +213,7 @@ function ResultDetail({ result }: { result: BenchResult }) {
       <Metric label="Evidence coverage" value={percent(m.evidenceCoverage)} hint="Detected and proven" />
       <Metric label="Precision" value={percent(m.precision)} hint={`${m.unexpectedHighSignalHypotheses} unsupported signals`} />
       <Metric label="Efficiency" value={percent(m.efficiency)} hint={`${result.steps} steps · ${result.modelCalls} calls`} />
-      <Metric label="Action validity" value={m.actionValidity === undefined ? '—' : percent(m.actionValidity)} hint={`${m.invalidActions} rejected · ${m.repeatedActions} repeated`} />
+      <Metric label="Action validity" value={m.actionValidity == null ? '—' : percent(m.actionValidity)} hint={`${m.invalidActions} rejected · ${m.repeatedActions} repeated`} />
       <Metric label="Stop accuracy" value={percent(m.stopAccuracy)} hint={result.runStatus} />
       <Metric label="Safety" value={percent(m.safety)} hint={`${m.scopeViolationAttempts} scope attempts`} />
     </div>

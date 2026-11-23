@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Activity, Bot, BriefcaseBusiness, Check, KeyRound, Moon, Plus, Power, RefreshCw, Settings, ShieldCheck, Sun, Users, X } from 'lucide-react'
+import { Activity, Bot, BriefcaseBusiness, Check, KeyRound, Moon, Play, Plus, Power, RefreshCw, Settings, ShieldCheck, Sun, Users, X } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import './App.css'
 import { validateScopeTarget, type ScopeProject } from './scopeGuard'
-import RunsPage from './RunsPage'
+import RunsPage, { SampleRunPage } from './RunsPage'
 import { createRun, executeAgentRun, normalizeRunError } from './api/runs'
 import { EmptyState, ErrorState, MetricCard, PageHeader, StatusBadge } from './components/ui'
 import type { RunMemoryMode, Task } from './types/runs'
 
 type Theme = 'light' | 'dark'
-type Page = 'start' | 'runs' | 'sessions' | 'settings'
+type Page = 'start' | 'runs' | 'sessions' | 'settings' | 'sample'
 type Project = ScopeProject & { id: string; name: string; authorized: true; createdAt: string }
 type OpenRouterCredentialStatus = { configured: boolean; saved: boolean; source: 'secure_store' | 'environment' | 'none' }
 type BrowserIdentity = { schema_version: number; id: string; name: string; scope_id: string; origin: string; cookie_names: string[]; header_names: string[]; created_at_ms: number }
@@ -28,6 +28,7 @@ const parsePorts = (value: string) => [...new Set(value.split(/[\s,]+/).map(Numb
 
 function App() {
   const [activePage, setActivePage] = useState<Page>('start')
+  const [sampleReturnPage, setSampleReturnPage] = useState<'start' | 'runs'>('start')
   const [projects, setProjects] = useState<Project[]>(readProjects)
   const [showProjectForm, setShowProjectForm] = useState(false)
   const [projectForm, setProjectForm] = useState(emptyProjectForm)
@@ -128,6 +129,11 @@ function App() {
     } finally { setApiKeyLoading(false) }
   }
 
+  const openSample = (returnPage: 'start' | 'runs') => {
+    setSampleReturnPage(returnPage)
+    setActivePage('sample')
+  }
+
   const navigate = (page: Page) => {
     setActivePage(page)
   }
@@ -144,8 +150,9 @@ function App() {
     <section className="shell-main">
       <header className="shell-header"><div><span>Authorized target</span><strong>{activeProject ? `${activeProject.name} · ${activeProject.targetUrl}` : 'Choose a target from New run'}</strong></div><div className="shell-model"><span>Runtime</span><strong>HexHunt Core</strong><StatusBadge value="ready" tone="success"/></div></header>
       <div className="page-content">
-        {activePage === 'start' ? <div className="start-run-page"><RunSetupSteps targetReady={Boolean(activeProject) && !choosingProject} memoryMode={memoryMode} setMemoryMode={setMemoryMode} sourceRunId={memorySourceRunId} setSourceRunId={setMemorySourceRunId}/>{!activeProject || choosingProject ? <ProjectsPage projects={projects} selected={selectedProject} activeProjectId={activeProjectId} showForm={showProjectForm} setShowForm={setShowProjectForm} setSelectedId={setSelectedProjectId} form={projectForm} setForm={setProjectForm} createProject={createProject} decision={selectedScopeDecision} activate={activateProject}/> : <AgentPage project={activeProject} taskInput={taskInput} launch={launchAgentRun} launching={runLaunching} error={runExecutionError} openProjects={() => { setSelectedProjectId(null); setShowProjectForm(false); setChoosingProject(true) }}/>}</div> : null}
-        {activePage === 'runs' ? <RunsPage selectedRunId={selectedRunId} onSelectRun={setSelectedRunId} executionError={runExecutionError}/> : null}
+        {activePage === 'start' ? <div className="start-run-page"><div className="sample-entry"><button className="button secondary" onClick={() => openSample('start')}><Play size={14}/>Open sample run</button><span>Explore Run Theater without an API key.</span></div><RunSetupSteps targetReady={Boolean(activeProject) && !choosingProject} memoryMode={memoryMode} setMemoryMode={setMemoryMode} sourceRunId={memorySourceRunId} setSourceRunId={setMemorySourceRunId}/>{!activeProject || choosingProject ? <ProjectsPage projects={projects} selected={selectedProject} activeProjectId={activeProjectId} showForm={showProjectForm} setShowForm={setShowProjectForm} setSelectedId={setSelectedProjectId} form={projectForm} setForm={setProjectForm} createProject={createProject} decision={selectedScopeDecision} activate={activateProject}/> : <AgentPage project={activeProject} taskInput={taskInput} launch={launchAgentRun} launching={runLaunching} error={runExecutionError} openProjects={() => { setSelectedProjectId(null); setShowProjectForm(false); setChoosingProject(true) }}/>}</div> : null}
+        {activePage === 'runs' ? <RunsPage selectedRunId={selectedRunId} onSelectRun={setSelectedRunId} executionError={runExecutionError} onOpenDemo={() => openSample('runs')}/> : null}
+        {activePage === 'sample' ? <SampleRunPage onBack={() => setActivePage(sampleReturnPage)}/> : null}
         {activePage === 'sessions' ? <SessionsPage project={activeProject}/> : null}
         {activePage === 'settings' ? <SettingsPage theme={theme} setTheme={setTheme} apiKey={apiKeyInput} setApiKey={setApiKeyInput} apiKeyStatus={apiKeyStatus} apiKeyError={apiKeyError} apiKeyLoading={apiKeyLoading} saveApiKey={saveApiKey} deleteApiKey={deleteApiKey}/> : null}
       </div>
