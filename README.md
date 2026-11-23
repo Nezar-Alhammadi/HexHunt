@@ -55,9 +55,11 @@ sudo apt install ./HexHunt_*.deb
 
 Then open **Settings**, add an OpenRouter API key, create an authorized target, and start a run.
 
+Choose **Open sample run** from **New run** to explore Run Theater with a built-in fictional record. Open a citation in **Outcome** to jump to its entry in the **Evidence room**. The sample needs no API key and sends no requests.
+
 ### Build from source
 
-Requirements: Node.js 20+, the stable Rust toolchain, and the Linux packages required by Tauri/WebKitGTK.
+Build with Node.js 22.12 or later, the stable Rust toolchain, and the Linux packages required by Tauri/WebKitGTK.
 
 ```bash
 cd HexHunt

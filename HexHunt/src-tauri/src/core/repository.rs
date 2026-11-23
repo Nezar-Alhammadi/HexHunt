@@ -1,9 +1,15 @@
-use super::{RunRecord, RunServiceError, RunServiceErrorCode};
+use super::{RunEvent, RunRecord, RunServiceError, RunServiceErrorCode};
 use std::{collections::HashMap, sync::RwLock};
 
 pub(crate) trait RunRepository: Send + Sync {
     fn load_all(&self) -> Result<Vec<RunRecord>, RunServiceError>;
     fn save_record(&self, record: &RunRecord) -> Result<(), RunServiceError>;
+
+    fn append_event(&self, record: &RunRecord, event: &RunEvent) -> Result<(), RunServiceError> {
+        let mut updated = record.clone();
+        updated.events.push(event.clone());
+        self.save_record(&updated)
+    }
 }
 
 #[derive(Default)]

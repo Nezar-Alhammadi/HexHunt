@@ -26,6 +26,8 @@ jobs:
           cache-dependency-path: ${{ matrix.project }}/package-lock.json
       - run: npm ci
       - run: npm run build
+      - if: matrix.project == 'HexHunt-Bench'
+        run: npm test
 
   rust:
     runs-on: ubuntu-24.04
@@ -42,4 +44,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: cargo test --manifest-path HexHunt/src-tauri/Cargo.toml
+      - name: Measure SQLite event append latency
+        run: cargo test --manifest-path HexHunt/src-tauri/Cargo.toml --lib sqlite_event_append_latency -- --ignored --nocapture
       - run: cargo test --manifest-path HexHunt-Bench/src-tauri/Cargo.toml

@@ -1568,6 +1568,82 @@ mod tests {
         task
     }
 
+    #[test]
+    fn finish_gate_requires_evidence_stored_for_the_run() {
+        let service = RunService::default();
+        let task = http_task(4_280);
+        let run = service.create_run(task.clone()).unwrap();
+        service.start_run(&run.id).unwrap();
+
+        let result = service
+            .append_tool_result(
+                &run.id,
+                ToolResult {
+                    schema_version: CORE_SCHEMA_VERSION,
+                    id: ToolResultId("finish-gate-fixture".into()),
+                    tool_name: "http_request".into(),
+                    success: true,
+                    data: StructuredData::from([
+                        ("method".into(), Value::from("GET")),
+                        (
+                            "final_url".into(),
+                            Value::from(task.primary_target.as_str()),
+                        ),
+                        ("status_code".into(), Value::from(200)),
+                    ]),
+                    error: None,
+                    duration_ms: 0,
+                },
+            )
+            .unwrap();
+        let evidence = EvidenceRecorder::default()
+            .record_tool_result(&service, &run.id, 1, &result)
+            .unwrap()
+            .expect("the synthetic HTTP result should produce stored evidence");
+
+        let mut final_output = output();
+        let missing = AgentRuntime::validate_final_output_evidence(
+            &service,
+            &run.id,
+            &task,
+            &final_output,
+            true,
+            None,
+        )
+        .unwrap()
+        .expect("the final output must explicitly reference the stored evidence");
+        assert_eq!(missing.code, AgentRuntimeErrorCode::InvalidAgentAction);
+        assert!(missing
+            .message
+            .contains("requires at least one stored Evidence ID"));
+
+        final_output.evidence_ids.push(evidence.id);
+        assert!(AgentRuntime::validate_final_output_evidence(
+            &service,
+            &run.id,
+            &task,
+            &final_output,
+            true,
+            None,
+        )
+        .unwrap()
+        .is_none());
+
+        let other_run = service.create_run(task.clone()).unwrap();
+        let foreign = AgentRuntime::validate_final_output_evidence(
+            &service,
+            &other_run.id,
+            &task,
+            &final_output,
+            true,
+            None,
+        )
+        .unwrap()
+        .expect("evidence from another run must be rejected");
+        assert_eq!(foreign.code, AgentRuntimeErrorCode::InvalidAgentAction);
+        assert!(foreign.message.contains("unknown Evidence ID"));
+    }
+
     fn event_names(events: &[RunEvent]) -> Vec<&'static str> {
         events
             .iter()
