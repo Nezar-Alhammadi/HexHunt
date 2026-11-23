@@ -33,3 +33,7 @@ cargo test --locked --manifest-path HexHunt/src-tauri/Cargo.toml --lib finish_ga
 ```
 
 The test checks that a successful final output must cite an evidence ID stored for that run. Omitting the ID or citing it from another run is rejected.
+
+## Evidence review and persistence baselines
+
+Use the [offline baselines](./docs/offline-baselines.md) to compare evidence reviewers on fictional records and measure the time it takes HexHunt Core to persist an event as the run history grows.

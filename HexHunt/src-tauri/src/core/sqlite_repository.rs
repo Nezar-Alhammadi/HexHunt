@@ -213,6 +213,11 @@ impl RunRepository for SqliteRunRepository {
             )
         })
     }
+
+    fn append_event(&self, record: &RunRecord, event: &RunEvent) -> Result<(), RunServiceError> {
+        let connection = self.connection.lock().map_err(|_| database_lock_error())?;
+        insert_event(&connection, event, record.events.len())
+    }
 }
 
 fn clear_run_children(transaction: &Transaction<'_>, run_id: &str) -> Result<(), RunServiceError> {
@@ -499,11 +504,20 @@ fn replace_events(
         )
         .map_err(|_| database_write_error())?;
     for (sequence, event) in record.events.iter().enumerate() {
-        transaction.execute(
-            "INSERT INTO run_events(event_id, run_id, event_kind, timestamp_ms, payload_json, sequence_number, event_json) VALUES(?1,?2,?3,?4,?5,?6,?7)",
-            params![event.id.0, record.run.id.0, event_kind(&event.kind), to_i64(event.timestamp_ms), encode(&event.kind)?, sequence as i64, encode(event)?],
-        ).map_err(|_| database_write_error())?;
+        insert_event(transaction, event, sequence)?;
     }
+    Ok(())
+}
+
+fn insert_event(
+    connection: &Connection,
+    event: &RunEvent,
+    sequence: usize,
+) -> Result<(), RunServiceError> {
+    connection.execute(
+        "INSERT INTO run_events(event_id, run_id, event_kind, timestamp_ms, payload_json, sequence_number, event_json) VALUES(?1,?2,?3,?4,?5,?6,?7)",
+        params![event.id.0, event.run_id.0, event_kind(&event.kind), to_i64(event.timestamp_ms), encode(&event.kind)?, sequence as i64, encode(event)?],
+    ).map_err(|_| database_write_error())?;
     Ok(())
 }
 
@@ -734,6 +748,133 @@ mod tests {
             available_tools: vec![],
             memory_policy: Default::default(),
         }
+    }
+
+    struct RewriteRepository(Arc<SqliteRunRepository>);
+
+    impl RunRepository for RewriteRepository {
+        fn load_all(&self) -> Result<Vec<RunRecord>, RunServiceError> {
+            self.0.load_all()
+        }
+
+        fn save_record(&self, record: &RunRecord) -> Result<(), RunServiceError> {
+            self.0.save_record(record)
+        }
+    }
+
+    #[test]
+    fn failed_event_insert_can_be_retried() {
+        use crate::core::RunEventId;
+
+        let repository = Arc::new(SqliteRunRepository::open(Path::new(":memory:")).unwrap());
+        let service = RunService::with_repository(repository.clone()).unwrap();
+        let run = service.create_run(task()).unwrap();
+        service.start_run(&run.id).unwrap();
+        let original = service.get_run_events(&run.id).unwrap();
+        let event = RunEvent {
+            schema_version: CORE_SCHEMA_VERSION,
+            id: RunEventId("retry-event".into()),
+            run_id: run.id.clone(),
+            timestamp_ms: original.last().unwrap().timestamp_ms,
+            step: 0,
+            kind: RunEventKind::ToolStarted {
+                tool_name: "synthetic_status_record".into(),
+            },
+        };
+        repository
+            .connection
+            .lock()
+            .unwrap()
+            .execute_batch(
+                "CREATE TRIGGER reject_event BEFORE INSERT ON run_events
+                 BEGIN SELECT RAISE(ABORT, 'synthetic write failure'); END;",
+            )
+            .unwrap();
+
+        let error = service.append_event(&run.id, event.clone()).unwrap_err();
+        assert_eq!(error.code, RunServiceErrorCode::DatabaseWriteFailed);
+        assert_eq!(service.get_run_events(&run.id).unwrap(), original);
+        assert_eq!(repository.load_all().unwrap()[0].events, original);
+
+        repository
+            .connection
+            .lock()
+            .unwrap()
+            .execute_batch("DROP TRIGGER reject_event;")
+            .unwrap();
+        service.append_event(&run.id, event.clone()).unwrap();
+        let restored = repository.load_all().unwrap().pop().unwrap();
+        assert_eq!(restored.events.len(), original.len() + 1);
+        assert_eq!(restored.events.last(), Some(&event));
+    }
+
+    #[test]
+    #[ignore = "run explicitly to measure SQLite persistence latency"]
+    fn sqlite_event_append_latency() {
+        use crate::core::RunEventId;
+        use std::time::Instant;
+
+        const SAMPLES: usize = 25;
+        let directory = std::env::temp_dir().join(format!("hexhunt-latency-{}", Uuid::new_v4()));
+        std::fs::create_dir_all(&directory).unwrap();
+        println!("write_path,existing_events,samples,p50_ms,p95_ms");
+
+        for (name, size) in ["rewrite", "append"]
+            .into_iter()
+            .flat_map(|name| [100_usize, 1_000, 5_000].map(|size| (name, size)))
+        {
+            let path = directory.join(format!("{name}-{size}.sqlite3"));
+            let repository = Arc::new(SqliteRunRepository::open(&path).unwrap());
+            let service = RunService::with_repository(repository.clone()).unwrap();
+            let run = service.create_run(task()).unwrap();
+            service.start_run(&run.id).unwrap();
+            drop(service);
+
+            let kind = RunEventKind::ToolStarted {
+                tool_name: "synthetic_status_record".into(),
+            };
+            let mut record = repository.load_all().unwrap().pop().unwrap();
+            let timestamp_ms = record.events.last().unwrap().timestamp_ms;
+            for index in record.events.len()..size {
+                record.events.push(RunEvent {
+                    schema_version: CORE_SCHEMA_VERSION,
+                    id: RunEventId(format!("seed-event-{index}")),
+                    run_id: run.id.clone(),
+                    timestamp_ms,
+                    step: 0,
+                    kind: kind.clone(),
+                });
+            }
+            repository.save_record(&record).unwrap();
+            drop(record);
+
+            let writer: Arc<dyn RunRepository> = if name == "rewrite" {
+                Arc::new(RewriteRepository(repository.clone()))
+            } else {
+                repository.clone()
+            };
+            let service = RunService::with_repository(writer).unwrap();
+            let mut samples = Vec::with_capacity(SAMPLES);
+            let mut appended = Vec::with_capacity(SAMPLES);
+            for _ in 0..SAMPLES {
+                let started = Instant::now();
+                let event = service.record_event(&run.id, 0, kind.clone()).unwrap();
+                samples.push(started.elapsed().as_secs_f64() * 1_000.0);
+                appended.push(event);
+            }
+            samples.sort_by(f64::total_cmp);
+            let p50 = samples[(SAMPLES * 50).div_ceil(100) - 1];
+            let p95 = samples[(SAMPLES * 95).div_ceil(100) - 1];
+            println!("{name},{size},{SAMPLES},{p50:.3},{p95:.3}");
+            drop(service);
+            drop(repository);
+
+            let reopened = SqliteRunRepository::open(&path).unwrap();
+            let stored = reopened.load_all().unwrap().pop().unwrap();
+            assert_eq!(stored.events.len(), size + SAMPLES);
+            assert_eq!(&stored.events[size..], appended.as_slice());
+        }
+        std::fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]

@@ -1280,7 +1280,6 @@ impl RunService {
         }
 
         let mut store = self.write_store()?;
-        let previous = store.clone();
         self.ensure_event_id_available(&store, &event.id)?;
         let record = store
             .runs
@@ -1303,9 +1302,9 @@ impl RunService {
             }
         }
 
+        self.repository.append_event(record, &event)?;
         record.events.push(event.clone());
         store.event_ids.insert(event.id.clone());
-        self.persist_record_locked(&mut store, previous, run_id)?;
         Ok(event)
     }
 

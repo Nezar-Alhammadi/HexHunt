@@ -1,0 +1,61 @@
+[
+  {
+    "id": "matching-reading",
+    "runId": "sample-run",
+    "claim": { "service": "calendar", "status": "operational" },
+    "citations": ["reading-1"],
+    "evidence": [{ "id": "reading-1", "runId": "sample-run", "service": "calendar", "status": "operational" }],
+    "expected": "supported"
+  },
+  {
+    "id": "opposite-reading",
+    "runId": "sample-run",
+    "claim": { "service": "calendar", "status": "operational" },
+    "citations": ["reading-2"],
+    "evidence": [{ "id": "reading-2", "runId": "sample-run", "service": "calendar", "status": "degraded" }],
+    "expected": "contradicted"
+  },
+  {
+    "id": "different-service",
+    "runId": "sample-run",
+    "claim": { "service": "calendar", "status": "operational" },
+    "citations": ["reading-3"],
+    "evidence": [{ "id": "reading-3", "runId": "sample-run", "service": "mail", "status": "operational" }],
+    "expected": "insufficient"
+  },
+  {
+    "id": "conflicting-readings",
+    "runId": "sample-run",
+    "claim": { "service": "calendar", "status": "operational" },
+    "citations": ["reading-4", "reading-5"],
+    "evidence": [
+      { "id": "reading-4", "runId": "sample-run", "service": "calendar", "status": "operational" },
+      { "id": "reading-5", "runId": "sample-run", "service": "calendar", "status": "degraded" }
+    ],
+    "expected": "insufficient"
+  },
+  {
+    "id": "unknown-reference",
+    "runId": "sample-run",
+    "claim": { "service": "calendar", "status": "operational" },
+    "citations": ["missing-reading"],
+    "evidence": [],
+    "expected": "insufficient"
+  },
+  {
+    "id": "different-run",
+    "runId": "sample-run",
+    "claim": { "service": "calendar", "status": "operational" },
+    "citations": ["reading-6"],
+    "evidence": [{ "id": "reading-6", "runId": "other-run", "service": "calendar", "status": "operational" }],
+    "expected": "insufficient"
+  },
+  {
+    "id": "uncited-reading",
+    "runId": "sample-run",
+    "claim": { "service": "calendar", "status": "operational" },
+    "citations": [],
+    "evidence": [{ "id": "reading-7", "runId": "sample-run", "service": "calendar", "status": "operational" }],
+    "expected": "insufficient"
+  }
+]
