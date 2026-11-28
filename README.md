@@ -67,6 +67,34 @@ npm install
 npm run desktop:dev
 ```
 
+
+### Linux dependency preflight (Debian / Ubuntu / Kali)
+
+Before `npm run desktop:dev` or launching a build, check that the Tauri/WebKitGTK runtime packages are present. This command is **read-only**: it never installs packages and never touches API keys.
+
+```bash
+for pkg in libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1 librsvg2-2 patchelf; do
+  if dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
+    echo "OK   $pkg"
+  else
+    echo "MISS $pkg"
+  fi
+done
+```
+
+Expected output when everything is installed:
+
+```text
+OK   libwebkit2gtk-4.1-0
+OK   libgtk-3-0
+OK   libayatana-appindicator3-1
+OK   librsvg2-2
+OK   patchelf
+```
+
+Any `MISS` line means install that package with your distro tools (for example `sudo apt-get install <pkg>` on Debian/Ubuntu/Kali), then re-run the loop. Package names match the Tauri Linux prerequisites family used by this repo's WebKitGTK stack.
+
+
 ## How a run works
 
 1. You provide a target, a task, and the allowed scope.
